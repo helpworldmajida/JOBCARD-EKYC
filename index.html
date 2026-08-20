@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>মাজিদা গ্রাম পঞ্চায়েত - Job Card Search</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Bengali:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;background:#f3f6fb;color:#172033;font-family:"Noto Sans Bengali",Arial,sans-serif}
+    .wrap{max-width:1100px;margin:0 auto;padding:18px}
+    .hero{background:linear-gradient(135deg,#0b5ed7,#12458f);color:#fff;border-radius:20px;padding:24px 26px;box-shadow:0 10px 28px rgba(16,55,110,.18)}
+    .hero h1{margin:0;font-size:30px;font-weight:800}
+    .hero p{margin:8px 0 0;font-size:16px;opacity:.96}
+    .searchbox{margin-top:18px;background:#fff;border-radius:18px;padding:18px;box-shadow:0 8px 24px rgba(20,35,60,.08)}
+    .row{display:flex;gap:10px}
+    input{flex:1;height:52px;border:1px solid #c9d4e5;border-radius:11px;padding:0 16px;font-size:18px;outline:none}
+    input:focus{border-color:#1769e0;box-shadow:0 0 0 3px rgba(23,105,224,.12)}
+    button{height:52px;border:0;border-radius:11px;padding:0 25px;background:#0969da;color:#fff;font-size:17px;font-weight:700;cursor:pointer}
+    button:hover{background:#0759b9}
+    .hint{font-size:14px;color:#667085;margin:10px 2px 0}
+    .status{margin-top:16px}
+    .card{background:#fff;border-radius:16px;padding:18px;margin-top:14px;box-shadow:0 5px 20px rgba(20,35,60,.07);border:1px solid #e6ebf2}
+    .jobtitle{font-size:22px;font-weight:800;color:#12458f;margin-bottom:12px}
+    .badge{display:inline-block;padding:5px 10px;border-radius:999px;font-weight:700;font-size:13px}
+    .yes{background:#dff7e8;color:#137333}.no{background:#ffe3e3;color:#b42318}.neutral{background:#eef2f6;color:#475467}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .item{border:1px solid #e8edf3;border-radius:10px;padding:11px 13px;background:#fbfcfe}
+    .label{font-size:12px;color:#667085;margin-bottom:3px}.value{font-size:15px;font-weight:600;word-break:break-word}
+    .tablewrap{overflow:auto;margin-top:14px}
+    table{width:100%;border-collapse:collapse;min-width:820px}
+    th,td{padding:10px;border-bottom:1px solid #e8edf3;text-align:left;font-size:14px}
+    th{background:#f4f7fb;color:#344054;position:sticky;top:0}
+    .empty{text-align:center;padding:28px;color:#667085}
+    .error{color:#b42318;background:#fff0f0;border:1px solid #ffd0d0;border-radius:10px;padding:12px}
+    .count{font-weight:700;color:#12458f}
+    .footer{text-align:center;color:#98a2b3;font-size:12px;margin:18px 0}
+    @media(max-width:700px){
+      .wrap{padding:10px}.hero{padding:20px}.hero h1{font-size:23px}.row{flex-direction:column}
+      button{width:100%}.grid{grid-template-columns:1fr}
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <section class="hero">
+    <h1>🏠 মাজিদা গ্রাম পঞ্চায়েত</h1>
+    <p>Job Card Number দিয়ে Family / Household-এর সম্পূর্ণ তথ্য খুঁজুন</p>
+  </section>
+
+  <section class="searchbox">
+    <div class="row">
+      <input id="searchInput" type="text" inputmode="text" placeholder="যেমন: 001/021" autocomplete="off">
+      <button id="searchBtn">🔍 Search</button>
+    </div>
+    <div class="hint">শুধু <b>সংসদ নম্বর/জব কার্ডের শেষ ৩ সংখ্যা</b> লিখুন — যেমন <b>001/021</b> বা <b>1/21</b></div>
+  </section>
+
+  <div id="status" class="status"></div>
+  <div id="results"></div>
+
+  <div class="footer">Majida Gram Panchayat • Job Card / e-KYC Information</div>
+</div>
+
+<script src="data.js"></script>
+<script>
+  const input = document.getElementById('searchInput');
+  const btn = document.getElementById('searchBtn');
+  const statusBox = document.getElementById('status');
+  const results = document.getElementById('results');
+
+  function esc(v){
+    return String(v ?? '').replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+
+  function normalizePart(v){
+    return String(v).trim().replace(/\s+/g,'');
+  }
+
+  function parseSearch(value){
+    const s = normalizePart(value);
+    const m = s.match(/^(\d{1,3})\s*\/\s*(\d{1,})$/);
+    if(!m) return null;
+    const sansad = m[1].padStart(3,'0');
+    const jobSuffix = m[2].padStart(3,'0');
+    if(Number(sansad) < 1 || Number(sansad) > 20) return null;
+    return {sansad, jobSuffix};
+  }
+
+  function badge(v){
+    const x = String(v ?? '').trim().toLowerCase();
+    if(x === 'yes') return '<span class="badge yes">YES</span>';
+    if(x === 'no') return '<span class="badge no">NO</span>';
+    if(!x) return '<span class="badge neutral">—</span>';
+    return '<span class="badge neutral">'+esc(v)+'</span>';
+  }
+
+  function doSearch(){
+    const parsed = parseSearch(input.value);
+    results.innerHTML = '';
+    statusBox.innerHTML = '';
+
+    if(!parsed){
+      statusBox.innerHTML = '<div class="error">সঠিক ফরম্যাটে লিখুন। উদাহরণ: <b>001/021</b></div>';
+      return;
+    }
+
+    const rows = JOB_DATA[parsed.sansad] || [];
+    const wantedEnd = '/' + parsed.jobSuffix;
+    const matches = rows.filter(r => {
+      const job = String(r.job || '').trim();
+      return job.endsWith(wantedEnd);
+    });
+
+    if(!matches.length){
+      statusBox.innerHTML = '<div class="card empty">এই সংসদে <b>'+esc(parsed.jobSuffix)+'</b> নম্বর Job Card পাওয়া যায়নি।</div>';
+      return;
+    }
+
+    const fullJob = matches[0].job;
+    statusBox.innerHTML = '<div class="card"><span class="count">'+matches.length+'</span> জন সদস্য পাওয়া গেছে — Job Card: <b>'+esc(fullJob)+'</b></div>';
+
+    let html = '';
+    matches.forEach((r, i) => {
+      html += `
+      <div class="card">
+        <div class="jobtitle">👤 Applicant ${i+1} — ${esc(r.name || 'নাম নেই')}</div>
+        <div class="grid">
+          <div class="item"><div class="label">Job Card Number</div><div class="value">${esc(r.job)}</div></div>
+          <div class="item"><div class="label">Applicant No.</div><div class="value">${esc(r.applicantNo)}</div></div>
+          <div class="item"><div class="label">Applicant Name</div><div class="value">${esc(r.name)}</div></div>
+          <div class="item"><div class="label">Gender</div><div class="value">${esc(r.gender)}</div></div>
+          <div class="item"><div class="label">Name as per Aadhaar</div><div class="value">${esc(r.aadhaarName)}</div></div>
+          <div class="item"><div class="label">Aadhaar Seeded?</div><div class="value">${badge(r.aadhaarSeeded)}</div></div>
+          <div class="item"><div class="label">Authentication done?</div><div class="value">${badge(r.authentication)}</div></div>
+          <div class="item"><div class="label">Enabled for ABPS?</div><div class="value">${badge(r.abps)}</div></div>
+          <div class="item"><div class="label">e-KYC done?</div><div class="value">${badge(r.ekyc)}</div></div>
+          <div class="item"><div class="label">Remarks</div><div class="value">${esc(r.remarks || '—')}</div></div>
+          <div class="item"><div class="label">Date</div><div class="value">${esc(r.date || '—')}</div></div>
+        </div>
+      </div>`;
+    });
+    results.innerHTML = html;
+  }
+
+  btn.addEventListener('click', doSearch);
+  input.addEventListener('keydown', e => { if(e.key === 'Enter') doSearch(); });
+</script>
+</body>
+</html>
